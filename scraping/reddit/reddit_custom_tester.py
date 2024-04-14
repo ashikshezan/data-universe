@@ -1,6 +1,7 @@
 import asyncio
 import datetime as dt
 import json
+import os
 import random
 
 import pymongo
@@ -15,10 +16,23 @@ test_sample_size = 10
 
 
 def get_mongo_dataset():
-    client = pymongo.MongoClient("mongodb://localhost:27017/")
-    db = client["test_miner_db_in_house"]
-    collection = db["reddit_posts"]
-    data = list(collection.find({}))
+    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+    db_name = os.getenv("MONGO_DB", "reddit_miner_db_in_house")
+    collection_name = "reddit_posts"
+
+    try:
+        print("Connecting to MongoDB...")
+        print(f"Mongo URI: {mongo_uri} - DB Name: {db_name} - Collection Name: {collection_name}")
+
+        client = pymongo.MongoClient(mongo_uri)
+        db = client[os.getenv("MONGO_DB", "reddit_miner_db_in_house")]
+        collection = db[collection_name]
+        data = list(collection.find({}).limit(1000))
+
+    except Exception as e:
+        print(f"Error connecting to MongoDB: {e}")
+        data = []
+    print(f"Connection established - Posts fetched: {len(data)}")
     return data
 
 
@@ -39,9 +53,9 @@ async def test_validate():
         test_sample_size = len(dataset)
 
     # choosing a random sample of 10 posts
-    dataset = random.sample(dataset, 10)
+    dataset = random.sample(dataset, test_sample_size)
     entities = []
-    print(f"Expecting Pass. Number of posts to test: {len(dataset)}")
+    print(f"Expecting Pass. Sample count to be tested: {test_sample_size}")
 
     for i, post in enumerate(dataset):
         post = post["bittensor_data"]
@@ -67,3 +81,6 @@ async def test_validate():
 
 if __name__ == "__main__":
     asyncio.run(test_validate())
+
+
+# python -m scraping.reddit.reddit_custom_tester
