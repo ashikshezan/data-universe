@@ -1,18 +1,15 @@
 import dataclasses
+import datetime as dt
 import time
+from enum import IntEnum
+from typing import Any, Dict, List, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, validator
+
 from common import constants
 from common.date_range import DateRange
+
 from . import utils
-import datetime as dt
-from enum import IntEnum
-from typing import Any, Dict, List, Type, Optional
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    PositiveInt,
-    validator,
-)
 
 
 class StrictBaseModel(BaseModel):
@@ -31,9 +28,7 @@ class TimeBucket(StrictBaseModel):
     # Makes the object "Immutable" once created.
     model_config = ConfigDict(frozen=True)
 
-    id: PositiveInt = Field(
-        description="Monotonically increasing value idenitifying the given time bucket"
-    )
+    id: PositiveInt = Field(description="Monotonically increasing value idenitifying the given time bucket")
 
     # Manually define a hash function to handle TimeBucket not being seen as hashable by pydantic.
     def __hash__(self) -> int:
@@ -47,11 +42,7 @@ class TimeBucket(StrictBaseModel):
             datetime (datetime.datetime): A datetime object, assumed to be in UTC.
         """
         datetime.astimezone(dt.timezone.utc)
-        return TimeBucket(
-            id=utils.seconds_to_hours(
-                datetime.astimezone(tz=dt.timezone.utc).timestamp()
-            )
-        )
+        return TimeBucket(id=utils.seconds_to_hours(datetime.astimezone(tz=dt.timezone.utc).timestamp()))
 
     @classmethod
     def to_date_range(cls, bucket: "TimeBucket") -> DateRange:
@@ -95,9 +86,7 @@ class DataLabel(StrictBaseModel):
         """Converts the value to lower case to consistent casing throughout the system."""
         # See reply on https://stackoverflow.com/questions/28695245/can-a-string-ever-get-shorter-when-converted-to-upper-lowercase.
         if len(value.lower()) > 32:
-            raise ValueError(
-                f"Label: {value} when is over 32 characters when .lower() is applied: {value.lower()}."
-            )
+            raise ValueError(f"Label: {value} when is over 32 characters when .lower() is applied: {value.lower()}.")
         return value.lower()
 
 
@@ -120,9 +109,7 @@ class DataEntity(StrictBaseModel):
     content_size_bytes: int = Field(ge=0)
 
     @classmethod
-    def are_non_content_fields_equal(
-        cls, this: "DataEntity", other: "DataEntity"
-    ) -> bool:
+    def are_non_content_fields_equal(cls, this: "DataEntity", other: "DataEntity") -> bool:
         """Returns whether this entity matches the non-content fields of another entity."""
         return (
             this.uri == other.uri
@@ -158,9 +145,7 @@ class DataEntityBucket(StrictBaseModel):
     A single bucket is limited to 128MBs to ensure requests sent over the network aren't too large.
     """
 
-    id: DataEntityBucketId = Field(
-        description="Identifies the qualities by which this bucket is grouped."
-    )
+    id: DataEntityBucketId = Field(description="Identifies the qualities by which this bucket is grouped.")
     size_bytes: int = Field(ge=0, le=constants.DATA_ENTITY_BUCKET_SIZE_LIMIT_BYTES)
 
 

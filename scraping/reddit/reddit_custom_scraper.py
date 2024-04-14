@@ -1,28 +1,29 @@
+import asyncio
+import datetime as dt
+import os
+import random
 import time
+import traceback
+from typing import List
+
+import asyncpraw
+import bittensor as bt
+from dotenv import load_dotenv
+
 from common import constants, utils
+from common.data import DataEntity, DataLabel, DataSource
 from common.date_range import DateRange
 from scraping.reddit import model
-from scraping.scraper import ScrapeConfig, Scraper, ValidationResult
-import bittensor as bt
-from common.data import DataEntity, DataLabel, DataSource
-from typing import List
-import asyncpraw
+from scraping.reddit.model import RedditContent, RedditDataType
 from scraping.reddit.utils import (
-    is_valid_reddit_url,
-    validate_reddit_content,
-    get_time_input,
     get_custom_sort_input,
+    get_time_input,
+    is_valid_reddit_url,
     normalize_label,
     normalize_permalink,
+    validate_reddit_content,
 )
-from scraping.reddit.model import RedditContent, RedditDataType
-import traceback
-import datetime as dt
-import asyncio
-import random
-import os
-
-from dotenv import load_dotenv
+from scraping.scraper import ScrapeConfig, Scraper, ValidationResult
 
 load_dotenv()
 
@@ -59,9 +60,7 @@ class RedditCustomScraper(Scraper):
             try:
                 reddit_content_to_verify = RedditContent.from_data_entity(entity)
             except Exception:
-                bt.logging.error(
-                    f"Failed to decode RedditContent from data entity bytes: {traceback.format_exc()}."
-                )
+                bt.logging.error(f"Failed to decode RedditContent from data entity bytes: {traceback.format_exc()}.")
                 results.append(
                     ValidationResult(
                         is_valid=False,
@@ -83,9 +82,7 @@ class RedditCustomScraper(Scraper):
                     user_agent=RedditCustomScraper.USER_AGENT,
                 ) as reddit:
                     if reddit_content_to_verify.data_type == RedditDataType.POST:
-                        submission = await reddit.submission(
-                            url=reddit_content_to_verify.url
-                        )
+                        submission = await reddit.submission(url=reddit_content_to_verify.url)
                         # Parse the response.
                         content = self._best_effort_parse_submission(submission)
                     else:
@@ -131,22 +128,14 @@ class RedditCustomScraper(Scraper):
 
     async def scrape(self, scrape_config: ScrapeConfig) -> List[DataEntity]:
         """Scrapes a batch of reddit posts/comments according to the scrape config."""
-        bt.logging.trace(
-            f"Reddit custom scraper peforming scrape with config: {scrape_config}."
-        )
+        bt.logging.trace(f"Reddit custom scraper peforming scrape with config: {scrape_config}.")
 
-        assert (
-            not scrape_config.labels or len(scrape_config.labels) <= 1
-        ), "Can only scrape 1 subreddit at a time."
+        assert not scrape_config.labels or len(scrape_config.labels) <= 1, "Can only scrape 1 subreddit at a time."
 
         # Strip the r/ from the config or use 'all' if no label is provided.
-        subreddit_name = (
-            normalize_label(scrape_config.labels[0]) if scrape_config.labels else "all"
-        )
+        subreddit_name = normalize_label(scrape_config.labels[0]) if scrape_config.labels else "all"
 
-        bt.logging.trace(
-            f"Running custom Reddit scraper with search: {subreddit_name}."
-        )
+        bt.logging.trace(f"Running custom Reddit scraper with search: {subreddit_name}.")
 
         # Randomize between fetching submissions and comments to reduce api calls.
         fetch_submissions = bool(random.getrandbits(1))
@@ -174,23 +163,15 @@ class RedditCustomScraper(Scraper):
                         case "new":
                             submissions = subreddit.new(limit=search_limit)
                         case "top":
-                            submissions = subreddit.top(
-                                limit=search_limit, time_filter=search_time
-                            )
+                            submissions = subreddit.top(limit=search_limit, time_filter=search_time)
                         case "hot":
                             submissions = subreddit.hot(limit=search_limit)
 
-                    contents = [
-                        self._best_effort_parse_submission(submission)
-                        async for submission in submissions
-                    ]
+                    contents = [self._best_effort_parse_submission(submission) async for submission in submissions]
                 else:
                     comments = subreddit.comments(limit=search_limit)
 
-                    contents = [
-                        self._best_effort_parse_comment(comment)
-                        async for comment in comments
-                    ]
+                    contents = [self._best_effort_parse_comment(comment) async for comment in comments]
         except Exception:
             bt.logging.error(
                 f"Failed to scrape reddit using subreddit {subreddit_name}, limit {search_limit}, time {search_time}, sort {search_sort}: {traceback.format_exc()}."
@@ -201,9 +182,7 @@ class RedditCustomScraper(Scraper):
         # Return the parsed results, ignoring data that can't be parsed.
         parsed_contents = [content for content in contents if content != None]
 
-        bt.logging.success(
-            f"Completed scrape for subreddit {subreddit_name}. Scraped {len(parsed_contents)} items."
-        )
+        bt.logging.success(f"Completed scrape for subreddit {subreddit_name}. Scraped {len(parsed_contents)} items.")
 
         data_entities = []
         for content in parsed_contents:
@@ -211,9 +190,7 @@ class RedditCustomScraper(Scraper):
 
         return data_entities
 
-    def _best_effort_parse_submission(
-        self, submission: asyncpraw.models.Submission
-    ) -> RedditContent:
+    def _best_effort_parse_submission(self, submission: asyncpraw.models.Submission) -> RedditContent:
         """Performs a best effort parsing of a Reddit submission into a RedditContent
 
         Any errors are logged and ignored."""
@@ -223,14 +200,11 @@ class RedditCustomScraper(Scraper):
             user = submission.author.name if submission.author else model.DELETED_USER
             content = RedditContent(
                 id=submission.name,
-                url="https://www.reddit.com"
-                + normalize_permalink(submission.permalink),
+                url="https://www.reddit.com" + normalize_permalink(submission.permalink),
                 username=user,
                 communityName=submission.subreddit_name_prefixed,
                 body=submission.selftext,
-                createdAt=dt.datetime.utcfromtimestamp(submission.created_utc).replace(
-                    tzinfo=dt.timezone.utc
-                ),
+                createdAt=dt.datetime.utcfromtimestamp(submission.created_utc).replace(tzinfo=dt.timezone.utc),
                 dataType=RedditDataType.POST,
                 # Post only fields
                 title=submission.title,
@@ -238,15 +212,11 @@ class RedditCustomScraper(Scraper):
                 parentId=None,
             )
         except Exception:
-            bt.logging.trace(
-                f"Failed to decode RedditContent from Reddit Submission: {traceback.format_exc()}."
-            )
+            bt.logging.trace(f"Failed to decode RedditContent from Reddit Submission: {traceback.format_exc()}.")
 
         return content
 
-    def _best_effort_parse_comment(
-        self, comment: asyncpraw.models.Comment
-    ) -> RedditContent:
+    def _best_effort_parse_comment(self, comment: asyncpraw.models.Comment) -> RedditContent:
         """Performs a best effort parsing of a Reddit comment into a RedditContent
 
         Any errors are logged and ignored."""
@@ -260,9 +230,7 @@ class RedditCustomScraper(Scraper):
                 username=user,
                 communityName=comment.subreddit_name_prefixed,
                 body=comment.body,
-                createdAt=dt.datetime.utcfromtimestamp(comment.created_utc).replace(
-                    tzinfo=dt.timezone.utc
-                ),
+                createdAt=dt.datetime.utcfromtimestamp(comment.created_utc).replace(tzinfo=dt.timezone.utc),
                 dataType=RedditDataType.COMMENT,
                 # Post only fields
                 title=None,
@@ -270,9 +238,7 @@ class RedditCustomScraper(Scraper):
                 parentId=comment.parent_id,
             )
         except Exception:
-            bt.logging.trace(
-                f"Failed to decode RedditContent from Reddit Submission: {traceback.format_exc()}."
-            )
+            bt.logging.trace(f"Failed to decode RedditContent from Reddit Submission: {traceback.format_exc()}.")
 
         return content
 
@@ -367,9 +333,7 @@ async def test_validate():
             }
         ),
         # Change created_at.
-        good_entity.copy(
-            update={"datetime": good_entity.datetime + dt.timedelta(seconds=1)}
-        ),
+        good_entity.copy(update={"datetime": good_entity.datetime + dt.timedelta(seconds=1)}),
         # Change label.
         good_entity.copy(update={"label": DataLabel(value="bittensor_")}),
         # Change comment parent id.

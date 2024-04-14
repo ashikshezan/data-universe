@@ -1,12 +1,14 @@
-from urllib.parse import urlparse
-from scraping import utils
-from scraping.scraper import ValidationResult
-from scraping.reddit.model import RedditContent
-from common.data import DataEntity, DataLabel
-import bittensor as bt
-import traceback
 import datetime as dt
 import random
+import traceback
+from urllib.parse import urlparse
+
+import bittensor as bt
+
+from common.data import DataEntity, DataLabel
+from scraping import utils
+from scraping.reddit.model import RedditContent
+from scraping.scraper import ValidationResult
 
 
 def is_valid_reddit_url(url: str) -> bool:
@@ -30,9 +32,7 @@ def validate_reddit_content(
     try:
         content_to_validate = RedditContent.from_data_entity(entity_to_validate)
     except Exception:
-        bt.logging.error(
-            f"Failed to decode RedditContent from data entity bytes: {traceback.format_exc()}"
-        )
+        bt.logging.error(f"Failed to decode RedditContent from data entity bytes: {traceback.format_exc()}")
         return ValidationResult(
             is_valid=False,
             reason="Failed to decode data entity",
@@ -41,9 +41,7 @@ def validate_reddit_content(
 
     # Check Reddit id
     if content_to_validate.id != actual_content.id:
-        bt.logging.info(
-            f"Reddit ids do not match: {actual_content} != {content_to_validate}"
-        )
+        bt.logging.info(f"Reddit ids do not match: {actual_content} != {content_to_validate}")
         return ValidationResult(
             is_valid=False,
             reason="Reddit ids do not match",
@@ -52,9 +50,7 @@ def validate_reddit_content(
 
     # Check Reddit url
     if content_to_validate.url != actual_content.url:
-        bt.logging.info(
-            f"Reddit urls do not match: {actual_content} != {content_to_validate}"
-        )
+        bt.logging.info(f"Reddit urls do not match: {actual_content} != {content_to_validate}")
         return ValidationResult(
             is_valid=False,
             reason="Reddit urls do not match",
@@ -63,9 +59,7 @@ def validate_reddit_content(
 
     # Check Reddit username
     if content_to_validate.username != actual_content.username:
-        bt.logging.info(
-            f"Reddit usernames do not match: {actual_content} != {content_to_validate}"
-        )
+        bt.logging.info(f"Reddit usernames do not match: {actual_content} != {content_to_validate}")
         return ValidationResult(
             is_valid=False,
             reason="Reddit usernames do not match",
@@ -74,20 +68,21 @@ def validate_reddit_content(
 
     # Check Reddit community
     if content_to_validate.community != actual_content.community:
-        bt.logging.info(
-            f"Reddit communities do not match: {actual_content} != {content_to_validate}"
-        )
+        bt.logging.info(f"Reddit communities do not match: {actual_content} != {content_to_validate}")
         return ValidationResult(
             is_valid=False,
             reason="Reddit communities do not match",
             content_size_bytes_validated=entity_to_validate.content_size_bytes,
         )
 
-    # Check Reddit body
     if content_to_validate.body != actual_content.body:
-        bt.logging.info(
-            f"Reddit bodies do not match: {actual_content} != {content_to_validate}"
-        )
+        # Check Reddit body
+        print(" sample ~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print(content_to_validate.body)
+        print(" actual ~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print(actual_content.body)
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        bt.logging.info(f"Reddit bodies do not match: {actual_content} != {content_to_validate}")
         return ValidationResult(
             is_valid=False,
             reason="Reddit bodies do not match",
@@ -96,10 +91,11 @@ def validate_reddit_content(
 
     # Timestamps on the contents within the entities must be obfuscated to the minute.
     # If checking an data entity with obfuscated content we compare to the entity directly instead.
-    actual_content_obfuscated = utils.obfuscate_datetime_to_minute(
-        actual_content.created_at
-    )
+    actual_content_obfuscated = utils.obfuscate_datetime_to_minute(actual_content.created_at)
     if content_to_validate.created_at != actual_content_obfuscated:
+        bt.logging.info("entity_datetime: ", content_to_validate.created_at)
+        bt.logging.info("actual_datetime: ", actual_content.created_at)
+        bt.logging.info("obfuscated_datetime: ", actual_content_obfuscated)
         if content_to_validate.created_at == actual_content.created_at:
             bt.logging.info(
                 f"Provided Reddit content datetime was not obfuscated to the minute as required: {actual_content} != {content_to_validate}"
@@ -110,9 +106,7 @@ def validate_reddit_content(
                 content_size_bytes_validated=entity_to_validate.content_size_bytes,
             )
         else:
-            bt.logging.info(
-                f"Reddit timestamps do not match: {actual_content} != {content_to_validate}"
-            )
+            bt.logging.info(f"Reddit timestamps do not match: {actual_content} != {content_to_validate}")
             return ValidationResult(
                 is_valid=False,
                 reason="Reddit timestamps do not match",
@@ -121,9 +115,7 @@ def validate_reddit_content(
 
     # Check Reddit data_type
     if content_to_validate.data_type != actual_content.data_type:
-        bt.logging.info(
-            f"Reddit data types do not match: {actual_content} != {content_to_validate}"
-        )
+        bt.logging.info(f"Reddit data types do not match: {actual_content} != {content_to_validate}")
         return ValidationResult(
             is_valid=False,
             reason="Reddit data types do not match",
@@ -133,9 +125,7 @@ def validate_reddit_content(
     # Post Only Fields
     # Check Reddit Title
     if content_to_validate.title != actual_content.title:
-        bt.logging.info(
-            f"Reddit titles do not match: {actual_content} != {content_to_validate}"
-        )
+        bt.logging.info(f"Reddit titles do not match: {actual_content} != {content_to_validate}")
         return ValidationResult(
             is_valid=False,
             reason="Reddit titles do not match",
@@ -147,10 +137,7 @@ def validate_reddit_content(
     # Ignore exact parent id here until all scraped data has been scraped with correct parent id (~30 days):
     # Since the mistake was to assign the submission id which is always earlier and therefore smaller we can check that
     # length of the claimed is always less than or equal to that of the real entity.
-    if (
-        actual_content.parent_id is not None
-        and content_to_validate.parent_id is not None
-    ):
+    if actual_content.parent_id is not None and content_to_validate.parent_id is not None:
         if len(content_to_validate.parent_id) > len(actual_content.parent_id):
             bt.logging.info(
                 f"RedditContent parent id size too large: claimed {content_to_validate.parent_id} vs actual {actual_content.parent_id}."
@@ -169,9 +156,7 @@ def validate_reddit_content(
             content_to_validate.parent_id = None
 
     if content_to_validate.parent_id != actual_content.parent_id:
-        bt.logging.info(
-            f"Reddit parent ids do not match: {actual_content} != {content_to_validate}"
-        )
+        bt.logging.info(f"Reddit parent ids do not match: {actual_content} != {content_to_validate}")
         return ValidationResult(
             is_valid=False,
             reason="Reddit parent ids do not match",
@@ -186,18 +171,14 @@ def validate_reddit_content(
         # Extra check that the content size is reasonably close to what we expect.
         # Allow a 10 byte difference to account for timestamp serialization differences.
         byte_difference_allowed = 10
-        if (
-            entity_to_validate.content_size_bytes - actual_entity.content_size_bytes
-        ) > byte_difference_allowed:
+        if (entity_to_validate.content_size_bytes - actual_entity.content_size_bytes) > byte_difference_allowed:
             return ValidationResult(
                 is_valid=False,
                 reason="The claimed bytes are too big compared to the actual Reddit content",
                 content_size_bytes_validated=entity_to_validate.content_size_bytes,
             )
 
-        if not DataEntity.are_non_content_fields_equal(
-            actual_entity, entity_to_validate
-        ):
+        if not DataEntity.are_non_content_fields_equal(actual_entity, entity_to_validate):
             return ValidationResult(
                 is_valid=False,
                 reason="The DataEntity fields are incorrect based on the Reddit content",
@@ -206,9 +187,7 @@ def validate_reddit_content(
     except Exception:
         # This shouldn't really happen, but let's safeguard against it anyway to avoid us somehow accepting
         # corrupted or malformed data.
-        bt.logging.error(
-            f"Failed to convert RedditContent to DataEntity: {traceback.format_exc()}"
-        )
+        bt.logging.error(f"Failed to convert RedditContent to DataEntity: {traceback.format_exc()}")
         return ValidationResult(
             is_valid=False,
             reason="Failed to convert RedditContent to DataEntity",
